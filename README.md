@@ -2,6 +2,12 @@
 
 A retro-style endless runner game featuring a jumping llama, rendered in classic Apple II-inspired green monochrome graphics.
 
+![alt text](hero.png)
+
+Play Now! https://proofgeist.github.io/proof-llama-game/
+
+
+
 ## Description
 
 In this game, you control a llama that must jump over obstacles while collecting stars. The game features:
