@@ -7,6 +7,9 @@ class Llama {
         this.velocityY = 0;
         this.gravity = 0.5;
         this.jumpForce = -12;
+        this.minGravity = 0.2;  // Gravity when holding up
+        this.normalGravity = 0.5;  // Normal gravity
+        this.isHoldingUp = false;
         this.isJumping = false;
         this.groundY = 650;
         this.velocityX = 0;
@@ -27,6 +30,13 @@ class Llama {
         // Keep llama within canvas bounds
         if (this.x < 0) this.x = 0;
         if (this.x > canvas.width - this.width) this.x = canvas.width - this.width;
+
+        // Apply reduced gravity when holding up and moving upward
+        if (this.isHoldingUp && this.velocityY < 0) {
+            this.gravity = this.minGravity;
+        } else {
+            this.gravity = this.normalGravity;
+        }
 
         this.velocityY += this.gravity;
         this.y += this.velocityY;
@@ -79,20 +89,75 @@ class Obstacle {
     }
 }
 
+class Star {
+    constructor(x) {
+        this.x = x;
+        this.y = 550; // Slightly above ground
+        this.width = 20;
+        this.height = 20;
+        this.collected = false;
+    }
+
+    update(scrollSpeed) {
+        this.x -= scrollSpeed;
+    }
+
+    draw(ctx) {
+        if (this.collected) return;
+        
+        ctx.fillStyle = '#0f0';
+        // Draw a simple star shape
+        ctx.beginPath();
+        const centerX = this.x + this.width/2;
+        const centerY = this.y + this.height/2;
+        
+        for (let i = 0; i < 5; i++) {
+            const angle = (i * 4 * Math.PI) / 5 - Math.PI/2;
+            const x = centerX + Math.cos(angle) * this.width/2;
+            const y = centerY + Math.sin(angle) * this.height/2;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    collidesWith(llama) {
+        if (this.collected) return false;
+        return !(this.x > llama.x + llama.width || 
+                this.x + this.width < llama.x || 
+                this.y > llama.y || 
+                this.y + this.height < llama.y - llama.height);
+    }
+}
+
 class Game {
     constructor() {
         this.scrollSpeed = 3;
         this.obstacles = [];
         this.spawnTimer = 0;
-        this.spawnInterval = 120; // Frames between obstacle spawns
+        this.spawnInterval = 120;
+        this.minSpawnInterval = 60;
+        this.stars = [];
+        this.starPoints = 0;
         this.score = 0;
+        this.isMuted = false;
     }
 
     update() {
-        // Spawn new obstacles
+        // Random spawn interval
         this.spawnTimer++;
         if (this.spawnTimer >= this.spawnInterval) {
-            this.obstacles.push(new Obstacle(canvas.width));
+            if (Math.random() < 0.2) { // 20% chance for star
+                this.stars.push(new Star(canvas.width));
+            } else {
+                this.obstacles.push(new Obstacle(canvas.width));
+            }
+            // Random interval between spawns
+            this.spawnInterval = Math.max(
+                this.minSpawnInterval,
+                120 + Math.floor(Math.random() * 60)
+            );
             this.spawnTimer = 0;
         }
 
@@ -100,6 +165,16 @@ class Game {
         this.obstacles = this.obstacles.filter(obstacle => {
             obstacle.update(this.scrollSpeed);
             return obstacle.x + obstacle.width > 0;
+        });
+
+        // Update and remove off-screen stars
+        this.stars = this.stars.filter(star => {
+            star.update(this.scrollSpeed);
+            if (star.collidesWith(llama) && !star.collected) {
+                star.collected = true;
+                this.starPoints += 100;
+            }
+            return star.x + star.width > 0;
         });
 
         // Check for collisions
@@ -114,13 +189,15 @@ class Game {
     }
 
     draw(ctx) {
-        // Draw score
+        // Draw score and star points
         ctx.fillStyle = '#0f0';
         ctx.font = '20px monospace';
-        ctx.fillText(`Score: ${Math.floor(this.score/10)}`, 20, 30);
+        ctx.fillText(`Distance: ${Math.floor(this.score/10)}`, 20, 30);
+        ctx.fillText(`Stars: ${this.starPoints}`, 20, 60);
 
-        // Draw obstacles
+        // Draw obstacles and stars
         this.obstacles.forEach(obstacle => obstacle.draw(ctx));
+        this.stars.forEach(star => star.draw(ctx));
     }
 
     gameOver() {
@@ -131,16 +208,24 @@ class Game {
         ctx.fillText('Press SPACE to restart', canvas.width/2 - 120, canvas.height/2 + 40);
         this.scrollSpeed = 0;
         gameRunning = false;
+        gameMusic.pause();
+        gameMusic.currentTime = 0;
     }
 
     reset() {
         this.obstacles = [];
+        this.stars = [];
         this.spawnTimer = 0;
         this.score = 0;
+        this.starPoints = 0;
         this.scrollSpeed = 3;
+        this.spawnInterval = 120;
         llama.x = 100;
         llama.y = llama.groundY;
         llama.velocityY = 0;
+        if (!this.isMuted) {
+            gameMusic.play();
+        }
         gameRunning = true;
     }
 }
@@ -153,10 +238,18 @@ const llama = new Llama(100, 300);
 let gameRunning = true;
 const game = new Game();
 
+// Add after other const declarations
+const gameMusic = document.getElementById('gameMusic');
+gameMusic.volume = 0.3; // Set volume to 30%
+
 // Handle keyboard input
 document.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowUp') {
-        llama.jump();
+    if (event.code === 'Space') {
+        if (gameRunning) {
+            llama.jump();
+        } else {
+            game.reset();
+        }
     }
     if (event.key === 'ArrowLeft') {
         llama.velocityX = -llama.speed;
@@ -164,8 +257,17 @@ document.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowRight') {
         llama.velocityX = llama.speed;
     }
-    if (event.code === 'Space' && !gameRunning) {
-        game.reset();
+    if (event.key === 'ArrowUp') {
+        llama.isHoldingUp = true;
+    }
+    if (event.key === 'M') {  // M key toggles music
+        if (game.isMuted) {
+            gameMusic.play();
+            game.isMuted = false;
+        } else {
+            gameMusic.pause();
+            game.isMuted = true;
+        }
     }
 });
 
@@ -173,6 +275,9 @@ document.addEventListener('keydown', (event) => {
 document.addEventListener('keyup', (event) => {
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         llama.velocityX = 0;
+    }
+    if (event.key === 'ArrowUp') {
+        llama.isHoldingUp = false;
     }
 });
 
@@ -223,5 +328,20 @@ function addScanlines() {
         ctx.fillRect(0, i, canvas.width, 2);
     }
 }
+
+// Start music when game starts
+window.addEventListener('load', () => {
+    // Try to play music (browsers might block autoplay)
+    gameMusic.play().catch(error => {
+        console.log('Autoplay prevented - click to start game and music');
+    });
+});
+
+// Add click handler to start music (for browsers that block autoplay)
+document.addEventListener('click', () => {
+    if (!game.isMuted && gameMusic.paused) {
+        gameMusic.play();
+    }
+});
 
 gameLoop(); 
