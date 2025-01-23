@@ -92,7 +92,11 @@ class Obstacle {
 class Star {
     constructor(x) {
         this.x = x;
-        this.y = 550; // Slightly above ground
+        // Random height between ground level - 200 (high jump) and ground level - 50 (just above ground)
+        const groundLevel = 650;
+        const minHeight = 50;  // minimum height from ground
+        const maxHeight = 200; // maximum height from ground
+        this.y = groundLevel - minHeight - Math.random() * (maxHeight - minHeight);
         this.width = 20;
         this.height = 20;
         this.collected = false;
@@ -223,7 +227,7 @@ class Game {
         llama.x = 100;
         llama.y = llama.groundY;
         llama.velocityY = 0;
-        if (!this.isMuted) {
+        if (!this.isMuted && gameMusic.readyState >= 3) {
             gameMusic.play();
         }
         gameRunning = true;
@@ -240,7 +244,26 @@ const game = new Game();
 
 // Add after other const declarations
 const gameMusic = document.getElementById('gameMusic');
+const loadingIndicator = document.getElementById('loading');
+const musicControls = document.getElementById('music-controls');
 gameMusic.volume = 0.3; // Set volume to 30%
+
+// Music loading handlers
+gameMusic.addEventListener('loadstart', () => {
+    loadingIndicator.style.display = 'block';
+    gameRunning = false;
+});
+
+gameMusic.addEventListener('canplaythrough', () => {
+    loadingIndicator.style.display = 'none';
+    gameRunning = true;
+    gameLoop();
+});
+
+// Update music controls UI
+function updateMusicControls() {
+    musicControls.textContent = game.isMuted ? '[SOUND OFF] Music [M]' : '[SOUND ON] Music [M]';
+}
 
 // Handle keyboard input
 document.addEventListener('keydown', (event) => {
@@ -268,7 +291,20 @@ document.addEventListener('keydown', (event) => {
             gameMusic.pause();
             game.isMuted = true;
         }
+        updateMusicControls();
     }
+});
+
+// Add click handler for music controls
+musicControls.addEventListener('click', () => {
+    if (game.isMuted) {
+        gameMusic.play();
+        game.isMuted = false;
+    } else {
+        gameMusic.pause();
+        game.isMuted = true;
+    }
+    updateMusicControls();
 });
 
 // Add key up listener to stop movement when keys are released
@@ -331,17 +367,26 @@ function addScanlines() {
 
 // Start music when game starts
 window.addEventListener('load', () => {
+    updateMusicControls();
     // Try to play music (browsers might block autoplay)
-    gameMusic.play().catch(error => {
-        console.log('Autoplay prevented - click to start game and music');
-    });
+    if (!game.isMuted && gameMusic.readyState >= 3) {
+        gameMusic.play().catch(error => {
+            console.log('Autoplay prevented - click to start game and music');
+        });
+    }
 });
 
 // Add click handler to start music (for browsers that block autoplay)
 document.addEventListener('click', () => {
-    if (!game.isMuted && gameMusic.paused) {
+    if (!game.isMuted && gameMusic.paused && gameMusic.readyState >= 3) {
         gameMusic.play();
     }
 });
 
-gameLoop(); 
+// Only start the game loop after music is loaded
+if (gameMusic.readyState >= 3) {
+    gameLoop();
+} else {
+    loadingIndicator.style.display = 'block';
+    gameRunning = false;
+} 

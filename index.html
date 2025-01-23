@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>8-bit Llama Game</title>
     <style>
         body {
@@ -10,15 +11,58 @@
             align-items: center;
             height: 100vh;
             margin: 0;
+            flex-direction: column;
         }
         canvas {
             border: 2px solid #0f0;
         }
+        #loading {
+            color: #0f0;
+            font-family: monospace;
+            margin-bottom: 20px;
+            display: none;
+        }
+        #music-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 14px;
+            opacity: 0.7;
+            cursor: pointer;
+            user-select: none;
+        }
+        #music-controls:hover {
+            opacity: 1;
+        }
+        #instructions {
+            position: absolute;
+            top: 40px;
+            right: 10px;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 12px;
+            opacity: 0.7;
+            text-align: right;
+            line-height: 1.4;
+        }
+        #instructions:hover {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
+    <div id="loading">Loading music...</div>
     <canvas id="gameCanvas" width="1024" height="768"></canvas>
-    <audio id="gameMusic" loop>
+    <div id="music-controls">[SOUND ON] Music [M]</div>
+    <div id="instructions">
+        SPACE: Jump/Restart<br>
+        ↑: Float while jumping<br>
+        ←/→: Move left/right<br>
+        Collect ★ for points!
+    </div>
+    <audio id="gameMusic" preload="auto" loop>
         <source src="game-music.mp3" type="audio/mpeg">
     </audio>
     <script src="game.js"></script>
